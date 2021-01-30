@@ -35,9 +35,10 @@ logger = logging.getLogger(__name__)
 
 
 def assignments(update, context):
-    if context.user_data.get('logged_in', False):
+    flag = context.user_data.get('logged_in', False)
+    if not(flag):
         message = 'Login first by using /login in bot PM'
-    else:
+    if flag:
         creds['username'] = context.user_data['username']
         creds['password'] = context.user_data['password']
         with requests.session() as s:
