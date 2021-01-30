@@ -28,9 +28,14 @@ creds = {
 
 UNAME, PWD = range(2)
 
+logging.basicConfig(format='%(asctime)s-%(name)s-%(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+
 
 def assignments(update, context):
-    if 'logged_in' not in context.user_data.keys():
+    if context.user_data.get('logged_in', False):
         message = 'Login first by using /login in bot PM'
     else:
         creds['username'] = context.user_data['username']
@@ -43,9 +48,9 @@ def assignments(update, context):
             creds['logintoken'] = token
 
             s.post(LOGIN_URL,
-                allow_redirects=False,
-                data=creds,
-                headers=headers)
+                   allow_redirects=False,
+                   data=creds,
+                   headers=headers)
             headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
 
             data = s.get(URL)
@@ -71,21 +76,18 @@ def assignments(update, context):
                 }
             }]
             data = s.post(f'{URL}/lib/ajax/service.php',
-                        params=params,
-                        data=json.dumps(payload),
-                        headers=headers)
+                          params=params,
+                          data=json.dumps(payload),
+                          headers=headers)
             message = data.json()
     update.message.reply_text(message)
 
 
-logging.basicConfig(format='%(asctime)s-%(name)s-%(levelname)s - %(message)s',
-                    level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-
-
 def start(update, context):
-    update.message.reply_text('Moodle is shit')
+    if update.effective_chat['type'] == 'private':
+        update.message.reply_text('Send /login to login into your moodle')
+    else:
+        update.message.reply_text('Moodle bot for easy access to your assignments')
 
 
 def error(update, context):
@@ -94,8 +96,12 @@ def error(update, context):
 
 
 def login(update, context):
-    update.message.reply_text('Enter your moodle username')
-    return UNAME
+    if update.effective_chat['type'] == 'private':
+        update.message.reply_text('Enter your moodle username')
+        return UNAME
+    else:
+        update.message.reply_text('Please PM Bot to login')
+        return ConversationHandler.END
 
 
 def uname(update, context):
@@ -120,7 +126,7 @@ def pwd(update, context):
                data=creds,
                headers=headers)
         headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
-        data = s.get(LOGIN_URL + '?testsession=461',
+        data = s.get(URL,
                      allow_redirects=False,
                      headers=headers)
         if data.status_code == 303:
@@ -137,6 +143,15 @@ def cancel(update, context):
     update.message.reply_text('Bye')
 
 
+def logout(update, context):
+    if ('username' in context.user_data.keys()):
+        context.user_data.clear()
+        message = 'Logout Successful'
+    else:
+        message = 'No login detected'
+    update.message.reply_text(message)
+
+
 def main():
     updater = Updater(os.environ['API_KEY'])
 
@@ -151,7 +166,7 @@ def main():
     )
 
     dp.add_handler(CommandHandler("start", start))
-
+    dp.add_handler(CommandHandler("logout", logout))
     dp.add_handler(CommandHandler("assignments", assignments))
     dp.add_handler(conv_handler)
     dp.add_error_handler(error)
