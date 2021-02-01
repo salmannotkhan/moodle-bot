@@ -61,7 +61,7 @@ def assignments(update, context):
         if update.effective_chat['type'] == 'private':
             message = 'First, Send /login to login into moodle'
         else:
-            message = 'Send message to bot in Private message to get started'
+            message = 'Send message to bot in PRIVATE to get started'
     if flag:
         username = context.user_data['username']
         password = context.user_data['password']
@@ -130,7 +130,7 @@ def login(update, context):
         update.message.reply_text('Enter your moodle username')
         return UNAME
     else:
-        update.message.reply_text('Please PM Bot to login')
+        update.message.reply_text('Send message to bot in PRIVATE to get started')
         return ConversationHandler.END
 
 
@@ -198,5 +198,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-print(time.time()-start)
