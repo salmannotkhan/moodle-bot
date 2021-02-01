@@ -58,7 +58,10 @@ def login_moodle(username, password):
 def assignments(update, context):
     flag = context.user_data.get('logged_in', False)
     if not(flag):
-        message = 'Send message to bot in Private message to get started'
+        if update.effective_chat['type'] == 'private':
+            message = 'First, Send /login to login into moodle'
+        else:
+            message = 'Send message to bot in Private message to get started'
     if flag:
         username = context.user_data['username']
         password = context.user_data['password']
