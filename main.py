@@ -26,6 +26,12 @@ creds = {
     'password': ''
 }
 
+message = """Id:{}
+{}
+Subject: {}
+Due Date: {}
+"""
+msession = 'MoodleSession={}'
 UNAME, PWD = range(2)
 
 logging.basicConfig(format='%(asctime)s-%(name)s-%(levelname)s - %(message)s',
@@ -33,26 +39,31 @@ logging.basicConfig(format='%(asctime)s-%(name)s-%(levelname)s - %(message)s',
 
 logger = logging.getLogger(__name__)
 
+def login_moodle(username, password):
+    creds['username'] = username
+    creds['password'] = password
+    with requests.session() as s:
+        login_page = s.get(LOGIN_URL)
+        soup = BeautifulSoup(login_page.text, 'html.parser')
+        headers['Cookie'] = msession.format(s.cookies.get("MoodleSession"))
+        token = soup.find('input', {'name': 'logintoken'}).attrs['value']
+        creds['logintoken'] = token
+
+        s.post(LOGIN_URL,
+                allow_redirects=False,
+                data=creds,
+                headers=headers)
+        return s
 
 def assignments(update, context):
     flag = context.user_data.get('logged_in', False)
     if not(flag):
-        message = 'Login first by using /login in bot PM'
+        message = 'Send message to bot in Private message to get started'
     if flag:
-        creds['username'] = context.user_data['username']
-        creds['password'] = context.user_data['password']
-        with requests.session() as s:
-            login_page = s.get(LOGIN_URL)
-            soup = BeautifulSoup(login_page.text, 'html.parser')
-            headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
-            token = soup.find('input', {'name': 'logintoken'}).attrs['value']
-            creds['logintoken'] = token
-
-            s.post(LOGIN_URL,
-                   allow_redirects=False,
-                   data=creds,
-                   headers=headers)
-            headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
+        username = context.user_data['username']
+        password = context.user_data['password']
+        with login_moodle(username, password) as s:
+            headers['Cookie'] = msession.format(s.cookies.get("MoodleSession"))
 
             data = s.get(URL)
             soup = BeautifulSoup(data.text, 'html.parser')
@@ -80,15 +91,30 @@ def assignments(update, context):
                           params=params,
                           data=json.dumps(payload),
                           headers=headers)
-            message = data.json()
+            res = data.json()[0]
+
+            if res['error']:
+                message = res['exception']['message']
+            else:
+                if len(res['data']['events']) > 0:
+                    for event in res['data']['events']:
+                        id = event['id']
+                        name = event['name']
+                        sub = event['course']['shortname']
+                        due = datetime.fromtimestamp(event['timestart'])
+                        due = due.strftime('%d/%m/%y %r')
+                        message = message.format(id, name, sub, due)
+                else:
+                    message = 'No submission due, you\'re a pro'
     update.message.reply_text(message)
 
 
 def start(update, context):
     if update.effective_chat['type'] == 'private':
-        update.message.reply_text('Send /login to login into your moodle')
+        message = 'Send /login to login into your moodle'
     else:
-        update.message.reply_text('Moodle bot for easy access to your assignments')
+        message = 'Moodle bot for easy access to your assignments'
+    update.message.reply_text(message)
 
 
 def error(update, context):
@@ -113,19 +139,9 @@ def uname(update, context):
 
 def pwd(update, context):
     context.user_data['password'] = update.message.text
-    creds['username'] = context.user_data['username']
-    creds['password'] = context.user_data['password']
-    with requests.session() as s:
-        login_page = s.get(LOGIN_URL)
-        soup = BeautifulSoup(login_page.text, 'html.parser')
-        headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
-        token = soup.find('input', {'name': 'logintoken'}).attrs['value']
-        creds['logintoken'] = token
-
-        s.post(LOGIN_URL,
-               allow_redirects=False,
-               data=creds,
-               headers=headers)
+    username = context.user_data['username']
+    password = context.user_data['password']
+    with login_moodle(username, password) as s:
         headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
         data = s.get(URL,
                      allow_redirects=False,
