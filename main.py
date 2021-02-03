@@ -16,6 +16,7 @@ import os
 
 URL = 'https://mca.glsmoodle.in'
 LOGIN_URL = f'{URL}/login/index.php'
+ASSIGN_URL = URL + '/mod/assign/view.php?id={}'
 sesskey_regex = r'(?<="sesskey":").+(?=","sessiontimeout")'
 headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
@@ -26,6 +27,12 @@ creds = {
     'password': ''
 }
 
+msg_format = """Id:{}
+{}
+Subject: {}
+Due Date: {}
+
+"""
 
 msession = 'MoodleSession={}'
 UNAME, PWD = range(2)
@@ -95,23 +102,42 @@ def assignments(update, context):
             if res['error']:
                 message = res['exception']['message']
             else:
-                message = """Id:{}
-{}
-Subject: {}
-Due Date: {}
-"""
+                message = ''
                 if len(res['data']['events']) > 0:
                     for event in res['data']['events']:
-                        id = event['id']
+                        id = event['instance']
                         name = event['name']
                         sub = event['course']['shortname']
                         due = datetime.fromtimestamp(event['timestart'])
                         due = due.strftime('%d/%m/%y %r')
-                        message = message.format(id, name, sub, due)
+                        message += msg_format.format(id, name, sub, due)
+                    message += 'use <code>/assignment [id]</code> to get info about it'
                 else:
                     message = 'No submission due, you\'re a pro'
-    update.message.reply_text(message)
+    update.message.reply_text(message, parse_mode='html')
 
+
+def assignment(update, context):
+    flag = context.user_data.get('logged_in', False)
+    if not(flag):
+        if update.effective_chat['type'] == 'private':
+            message = 'First, Send /login to login into moodle'
+        else:
+            message = 'Send message to bot in PRIVATE to get started'
+    if flag:
+        username = context.user_data['username']
+        password = context.user_data['password']
+        arg = update.message.text.replace('/assignment', '').strip()
+        if arg == '':
+            message = 'Specify Assignment ID to get info'
+        else:
+            with login_moodle(username, password) as s:
+                headers['Cookie'] = f'MoodleSession={s.cookies.get("MoodleSession")}'
+                data = s.get(ASSIGN_URL.format(arg), headers=headers)
+                soup = BeautifulSoup(data.text, 'html.parser')
+                division = soup.findAll('li', {'class': 'breadcrumb-item'})[-2]
+                message = division.get_text()
+    update.message.reply_text(message)
 
 def start(update, context):
     if update.effective_chat['type'] == 'private':
@@ -189,6 +215,7 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("logout", logout))
     dp.add_handler(CommandHandler("assignments", assignments))
+    dp.add_handler(CommandHandler("assignment", assignment))
     dp.add_handler(conv_handler)
     dp.add_error_handler(error)
 
