@@ -26,11 +26,7 @@ creds = {
     'password': ''
 }
 
-message = """Id:{}
-{}
-Subject: {}
-Due Date: {}
-"""
+
 msession = 'MoodleSession={}'
 UNAME, PWD = range(2)
 
@@ -99,6 +95,11 @@ def assignments(update, context):
             if res['error']:
                 message = res['exception']['message']
             else:
+                message = """Id:{}
+{}
+Subject: {}
+Due Date: {}
+"""
                 if len(res['data']['events']) > 0:
                     for event in res['data']['events']:
                         id = event['id']
