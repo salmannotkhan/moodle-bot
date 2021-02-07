@@ -47,6 +47,7 @@ def login_moodle(username, password):
     creds['password'] = password
     with requests.session() as s:
         login_page = s.get(LOGIN_URL)
+        print('here')
         soup = BeautifulSoup(login_page.text, 'html.parser')
         headers['Cookie'] = msession.format(s.cookies.get("MoodleSession"))
         token = soup.find('input', {'name': 'logintoken'}).attrs['value']
@@ -109,7 +110,7 @@ def assignments(update, context):
                         name = event['name']
                         sub = event['course']['shortname']
                         due = datetime.fromtimestamp(event['timestart'])
-                        due = due.strftime('%d/%m/%y %r')
+                        due = due.strftime('%d/%m/%y %I:%M %p')
                         message += msg_format.format(id, name, sub, due)
                     message += 'use <code>/assignment [id]</code> to get info about it'
                 else:
